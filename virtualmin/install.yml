@@ -1,0 +1,32 @@
+---
+- name: Install Virtualmin GPL with LAMP bundle on Ubuntu
+  hosts: all
+  become: yes
+  vars:
+    virtualmin_installer_url: "https://software.virtualmin.com/gpl/scripts/virtualmin-install.sh"
+    virtualmin_bundle: "LAMP"
+
+  tasks:
+    - name: Ensure required dependencies are installed
+      apt:
+        name:
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: yes
+
+    - name: Download Virtualmin install script
+      get_url:
+        url: "{{ virtualmin_installer_url }}"
+        dest: /root/virtualmin-install.sh
+        mode: '0755'
+
+    - name: Run Virtualmin installer
+      command: sh /root/virtualmin-install.sh -y --bundle {{ virtualmin_bundle }}
+      args:
+        creates: /etc/webmin/virtual-server/config
+
+    - name: Display access URL
+      debug:
+        msg: "Virtualmin should be available at https://{{ ansible_host }}:10000"
