@@ -1,6 +1,6 @@
 ---
 - name: Update Mikrometer System
-  hosts: servers
+  hosts: all
   become: true
 
   tasks:

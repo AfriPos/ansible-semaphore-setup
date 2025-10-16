@@ -1,6 +1,6 @@
 ---
 - name: Create or update root-like users and copy SSH keys
-  hosts: servers
+  hosts: all
   become: yes
 
   vars:
