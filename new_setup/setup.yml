@@ -1,6 +1,30 @@
-- name: Test become
+---
+- name: Copy MOTD from one server to all others (slurp+copy)
   hosts: all
   become: true
+  vars:
+    motd_source_host: cp2   # change to whichever host should be the canonical source
+
   tasks:
-    - name: whoami as root
-      command: whoami
+    - name: Read /etc/motd from the source host into memory
+      slurp:
+        src: /etc/motd
+      register: motd_slurp
+      delegate_to: "{{ motd_source_host }}"
+      run_once: true
+      become: true
+
+    - name: Fail if we couldn't fetch motd from source
+      fail:
+        msg: "Could not fetch /etc/motd from {{ motd_source_host }}"
+      when: motd_slurp is not defined or motd_slurp.content is not defined
+      run_once: true
+
+    - name: Write MOTD to each host (using become)
+      copy:
+        content: "{{ motd_slurp.content | b64decode }}"
+        dest: /etc/motd
+        owner: root
+        group: root
+        mode: '0644'
+      become: true
