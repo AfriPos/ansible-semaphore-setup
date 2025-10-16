@@ -1,17 +1,25 @@
 ---
-- name: Copy MOTD file from control node to all remote servers
+- name: Copy MOTD from one server to all others
   hosts: all
   become: true
   vars:
-    source_motd_path: /etc/motd
-    dest_motd_path: /etc/motd
+    motd_source_host: cp2      # The host you want to copy the MOTD *from*
+    motd_temp_path: /tmp/motd-temp
 
   tasks:
-    - name: Copy MOTD from control node to remote servers
+    - name: Fetch MOTD from source host
+      fetch:
+        src: /etc/motd
+        dest: "{{ motd_temp_path }}"
+        flat: yes
+      delegate_to: "{{ motd_source_host }}"
+      run_once: true
+
+    - name: Copy MOTD to all other servers
       copy:
-        src: "{{ source_motd_path }}"
-        dest: "{{ dest_motd_path }}"
+        src: "{{ motd_temp_path }}"
+        dest: /etc/motd
         owner: root
         group: root
-        mode: '0600'
-      ignore_errors: true
+        mode: '0644'
+      become: true
