@@ -1,0 +1,28 @@
+---
+- name: Copy MOTD file from control node to all remote servers
+  hosts: all
+  become: true
+  vars:
+    source_motd_path: /etc/motd
+    dest_motd_path: /etc/motd
+
+  tasks:
+    - name: Copy MOTD from control node to remote servers
+      ansible.builtin.copy:
+        src: "{{ source_motd_path }}"
+        dest: "{{ dest_motd_path }}"
+        owner: root
+        group: root
+        mode: '0644'
+      delegate_to: localhost
+      run_once: true
+      register: motd_file
+
+    - name: Distribute MOTD file to all other hosts
+      ansible.builtin.copy:
+        src: "{{ motd_file.dest }}"
+        dest: "{{ dest_motd_path }}"
+        owner: root
+        group: root
+        mode: '0644'
+      when: inventory_hostname != ansible_play_hosts_all[0]
