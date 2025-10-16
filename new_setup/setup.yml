@@ -1,13 +1,13 @@
 ---
 - name: Copy MOTD from one server to all others
   hosts: all
-  become: true
   vars:
-    motd_source_host: cp2      # The host you want to copy the MOTD *from*
+    motd_source_host: cp2
     motd_temp_path: /tmp/motd-temp
 
   tasks:
     - name: Fetch MOTD from source host
+      become: true
       fetch:
         src: /etc/motd
         dest: "{{ motd_temp_path }}"
@@ -15,11 +15,18 @@
       delegate_to: "{{ motd_source_host }}"
       run_once: true
 
-    - name: Copy MOTD to all other servers
-      copy:
+    - name: Copy MOTD to all other servers (with sudo)
+      become: true
+      ansible.builtin.copy:
         src: "{{ motd_temp_path }}"
         dest: /etc/motd
         owner: root
         group: root
         mode: '0644'
-      become: true
+
+    - name: Remove temporary MOTD file from control node
+      delegate_to: localhost
+      file:
+        path: "{{ motd_temp_path }}"
+        state: absent
+      run_once: true
