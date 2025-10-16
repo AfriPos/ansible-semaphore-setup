@@ -14,5 +14,4 @@
         owner: root
         group: root
         mode: '0600'
-      loop: "{{ users }}"
       ignore_errors: true
