@@ -1,0 +1,87 @@
+---
+- name: Create or update root-like users and copy SSH keys
+  hosts: servers
+  become: yes
+
+  vars:
+    users:
+      - name: dev-jm
+        password_hash: "$y$j9T$2B3BlVwU6pD14sQA/hRZm/$kLijqfZDOE7p1gjkADL8SCkyH6ncj9wFWuTnQybzx./"
+      - name: dev-km
+        password_hash: "$y$j9T$tGcUlxFYpzfZJZRZFxaGP0$CPmOSKq/tqooWpAU9QnTVe7qpsYbBm3sKPNXLoVBK81"
+
+  tasks:
+
+    - name: Ensure group 'devs' exists
+      ansible.builtin.group:
+        name: devs
+        state: present
+
+    - name: Ensure users exist
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        shell: /bin/bash
+        groups: sudo,devs
+        append: yes
+        password: "{{ item.password_hash }}"
+        state: present
+        create_home: yes
+      loop: "{{ users }}"
+
+    - name: Ensure .ssh directory exists
+      file:
+        path: "/home/{{ item.name }}/.ssh"
+        state: directory
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0700'
+      loop: "{{ users }}"
+
+    - name: Copy private SSH key
+      copy:
+        src: "/home/{{ item.name }}/.ssh/id_rsa"
+        dest: "/home/{{ item.name }}/.ssh/id_rsa"
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0600'
+      loop: "{{ users }}"
+      ignore_errors: true
+
+    - name: Copy public SSH key
+      copy:
+        src: "/home/{{ item.name }}/.ssh/id_rsa.pub"
+        dest: "/home/{{ item.name }}/.ssh/id_rsa.pub"
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0644'
+      loop: "{{ users }}"
+      ignore_errors: true
+
+    - name: Add public key to authorized_keys
+      ansible.builtin.authorized_key:
+        user: "{{ item.name }}"
+        key: "{{ lookup('file', '/home/' + item.name + '/.ssh/id_rsa.pub', errors='ignore') }}"
+        state: present
+        manage_dir: false
+        path: "/home/{{ item.name }}/.ssh/authorized_keys"
+      loop: "{{ users }}"
+      ignore_errors: true
+
+    - name: Allow passwordless sudo
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ item.name }}"
+        content: "{{ item.name }} ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+      loop: "{{ users }}"
+
+    - name: Copy authorized_keys if exists
+      copy:
+        src: "/home/{{ item.name }}/.ssh/authorized_keys"
+        dest: "/home/{{ item.name }}/.ssh/authorized_keys"
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0600'
+      loop: "{{ users }}"
+      ignore_errors: true

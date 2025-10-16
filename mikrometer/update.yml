@@ -1,0 +1,70 @@
+---
+- name: Update Mikrometer System
+  hosts: servers
+  become: true
+
+  tasks:
+    - name: Change ownership to ansible user
+      ansible.builtin.command:
+        cmd: "sudo chown -R {{ ansible_user }}:{{ ansible_user }} {{ mikrometer_path }}"
+
+    - name: Git pull
+      ansible.builtin.command:
+        cmd: git pull
+        chdir: "{{ mikrometer_path }}"
+      become: false
+
+    - name: Composer update
+      ansible.builtin.command:
+        cmd: composer update
+        chdir: "{{ mikrometer_path }}"
+      become: false
+
+    - name: Run database migrations (force yes in production)
+      ansible.builtin.shell: |
+        yes | php artisan migrate --force
+      args:
+        chdir: "{{ mikrometer_path }}"
+      become: false
+
+    - name: Make vite executable
+      ansible.builtin.command:
+        cmd: chmod +x node_modules/.bin/vite
+        chdir: "{{ mikrometer_path }}"
+      become: true
+
+    - name: Make esbuild executable
+      ansible.builtin.command:
+        cmd: chmod +x node_modules/@esbuild/linux-x64/bin/esbuild
+        chdir: "{{ mikrometer_path }}"
+      become: true
+
+    - name: NPM update & install
+      ansible.builtin.command:
+        cmd: sudo npm install
+        chdir: "{{ mikrometer_path }}"
+      become: false
+
+    - name: NPM build
+      ansible.builtin.command:
+        cmd: sudo npm run build
+        chdir: "{{ mikrometer_path }}"
+      become: false
+
+    - name: Laravel artisan cache commands
+      ansible.builtin.shell: |
+        sudo php artisan config:cache
+        sudo php artisan route:cache
+        sudo php artisan view:cache
+        sudo php artisan event:cache
+      args:
+        chdir: "{{ mikrometer_path }}"
+
+    - name: Change ownership back to mikrometer_user
+      ansible.builtin.command:
+        cmd: "sudo chown -R {{ mikrometer_user }}:{{ mikrometer_user }} {{ mikrometer_path }}"
+
+
+    - name: Change ownership back to mikrometer_group
+      ansible.builtin.command:
+        cmd: "sudo chmod -R g+w {{ mikrometer_path }}"

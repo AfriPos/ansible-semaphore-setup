@@ -1,0 +1,9 @@
+---
+- name: Reboot all servers
+  hosts: all
+  become: yes
+  tasks:
+    - name: Reboot the servers
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+        test_command: whoami
