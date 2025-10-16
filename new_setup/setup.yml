@@ -1,33 +1,30 @@
 ---
-- name: Copy MOTD from a main server to all other servers
+- name: Copy MOTD from one server to all others (slurp+copy)
   hosts: all
   become: true
   vars:
-    motd_source_host: cp2
-    motd_temp_path: /tmp/motd-temp
+    motd_source_host: cp2   # change to whichever host should be the canonical source
 
   tasks:
-    - name: Fetch MOTD from source host (cp2)
-      fetch:
+    - name: Read /etc/motd from the source host into memory
+      slurp:
         src: /etc/motd
-        dest: "{{ motd_temp_path }}"
-        flat: yes
+      register: motd_slurp
       delegate_to: "{{ motd_source_host }}"
       run_once: true
       become: true
 
-    - name: Copy MOTD to all other servers
+    - name: Fail if we couldn't fetch motd from source
+      fail:
+        msg: "Could not fetch /etc/motd from {{ motd_source_host }}"
+      when: motd_slurp is not defined or motd_slurp.content is not defined
+      run_once: true
+
+    - name: Write MOTD to each host (using become)
       copy:
-        src: "{{ motd_temp_path }}"
+        content: "{{ motd_slurp.content | b64decode }}"
         dest: /etc/motd
         owner: root
         group: root
         mode: '0644'
       become: true
-
-    - name: Clean up temporary MOTD file from Semaphore worker
-      delegate_to: localhost
-      file:
-        path: "{{ motd_temp_path }}"
-        state: absent
-      run_once: true
