@@ -1,4 +1,3 @@
----
 - name: Package and Security Updates with WhatsApp Notifications
   hosts: all
   become: yes
@@ -31,10 +30,11 @@
       register: apt_lock_check
       changed_when: false
 
-    - name: Update package cache
-      apt:
-        update_cache: yes
+    - name: Update package cache (using shell)
+      shell: |
+        apt update
       register: cache_update
+      changed_when: cache_update.rc == 0
 
     - name: Check for available updates
       shell: |
@@ -43,12 +43,15 @@
       changed_when: false
 
     - name: Install security updates only if available
-      apt:
-        upgrade: safe
-        update_cache: no
-        autoremove: yes
+      shell: |
+        apt upgrade -y
       register: security_upgrade
       when: available_updates.stdout | int > 0
+
+    - name: Auto remove unused packages
+      shell: |
+        apt autoremove -y
+      when: security_upgrade is defined and security_upgrade.changed
 
     - name: Check if reboot is required
       stat:
