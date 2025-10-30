@@ -1,0 +1,84 @@
+---
+- name: Package and Security Updates with WhatsApp Notifications
+  hosts: all
+  become: yes
+  vars:
+    callmebot_api_key: "8095329"
+    your_phone_number: "254759522009"
+
+  tasks:
+    - name: Send start notification
+      uri:
+        url: "https://api.callmebot.com/whatsapp.php?phone={{ your_phone_number }}&text={{ ('🔄 Updates: ' + inventory_hostname) | urlencode }}&apikey={{ callmebot_api_key }}"
+        method: GET
+        status_code: 200
+      delegate_to: localhost
+      ignore_errors: yes
+      register: start_message
+
+    - name: Pause after start message
+      pause:
+        seconds: 5
+      when: start_message.failed
+
+    - name: Update package cache
+      apt:
+        update_cache: yes
+      register: cache_update
+
+    - name: Check for available updates
+      shell: |
+        apt list --upgradable 2>/dev/null | tail -n +2 | wc -l
+      register: available_updates
+      changed_when: false
+
+    - name: Install security updates only if available
+      apt:
+        upgrade: safe
+        update_cache: no
+        autoremove: yes
+      register: security_upgrade
+      when: available_updates.stdout | int > 0
+
+    - name: Check if reboot is required
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Create final status message
+      set_fact:
+        final_message: |
+          {% if available_updates.stdout | int > 0 %}
+            ✅ {{ inventory_hostname }}: {{ available_updates.stdout | trim }} updates applied
+            {% if reboot_required.stat.exists %}🔴 REBOOT REQUIRED{% else %}🟢 No reboot needed{% endif %}
+          {% else %}
+            ✅ {{ inventory_hostname }}: Already up to date
+          {% endif %}
+
+    - name: Send final status with retry
+      uri:
+        url: "https://api.callmebot.com/whatsapp.php?phone={{ your_phone_number }}&text={{ final_message | urlencode }}&apikey={{ callmebot_api_key }}"
+        method: GET
+        status_code: 200
+        timeout: 30
+      delegate_to: localhost
+      register: final_status
+      retries: 3
+      delay: 10
+      until: final_status.status == 200
+      ignore_errors: yes
+
+    - name: Show local summary if WhatsApp failed
+      debug:
+        msg: |
+          📋 UPDATE SUMMARY for {{ inventory_hostname }}:
+          - Cache updated: {{ cache_update.changed }}
+          - Available updates: {{ available_updates.stdout | trim }}
+          - Upgrades applied: {{ security_upgrade.changed if security_upgrade is defined else 'No' }}
+          - Reboot required: {{ reboot_required.stat.exists }}
+          {% if final_status.failed %}
+          - WhatsApp notification: FAILED (API limit reached)
+          {% else %}
+          - WhatsApp notification: Sent successfully
+          {% endif %}
+      when: final_status.failed
