@@ -13,6 +13,7 @@
         method: GET
         status_code: 200
       delegate_to: localhost
+      become: no
       ignore_errors: yes
       register: start_message
 
@@ -20,6 +21,15 @@
       pause:
         seconds: 5
       when: start_message.failed
+      become: no
+
+    - name: Wait for apt to be available
+      shell: |
+        while fuser /var/lib/dpkg/lock >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+          sleep 1
+        done
+      register: apt_lock_check
+      changed_when: false
 
     - name: Update package cache
       apt:
