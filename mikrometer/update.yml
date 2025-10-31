@@ -3,55 +3,135 @@
   hosts: all
   become: true
 
+  vars:
+    has_changes: false
+    update_summary: []
+
   tasks:
     - name: Change ownership to ansible user
       ansible.builtin.command:
         cmd: "sudo chown -R {{ ansible_user }}:{{ ansible_user }} {{ mikrometer_path }}"
 
-    - name: Git pull
+    - name: Check for Git changes
+      ansible.builtin.command:
+        cmd: git fetch && git status --porcelain
+        chdir: "{{ mikrometer_path }}"
+      register: git_status
+      changed_when: false
+      become: false
+
+    - name: Set has_changes variable if there are changes
+      ansible.builtin.set_fact:
+        has_changes: true
+      when: git_status.stdout != ""
+
+    - name: Git pull (only if changes)
       ansible.builtin.command:
         cmd: git pull
         chdir: "{{ mikrometer_path }}"
+      register: git_pull_result
+      when: has_changes
       become: false
 
-    - name: Composer update
+    - name: Add Git pull to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Git repository updated'] }}"
+      when: has_changes and git_pull_result is defined
+
+    - name: Composer update (only if changes)
       ansible.builtin.command:
         cmd: composer update
         chdir: "{{ mikrometer_path }}"
+      register: composer_result
+      when: has_changes
       become: false
 
-    - name: Run database migrations (force yes in production)
+    - name: Add Composer update to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Composer dependencies updated'] }}"
+      when: has_changes and composer_result is defined
+
+    - name: Run database migrations (force yes in production) (only if changes)
       ansible.builtin.shell: |
         yes | php artisan migrate --force
       args:
         chdir: "{{ mikrometer_path }}"
+      register: migration_result
+      when: has_changes
       become: false
 
-    - name: Make vite executable
+    - name: Add database migrations to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Database migrations executed'] }}"
+      when: has_changes and migration_result is defined
+
+    - name: Run database seeder (force in production) (only if changes)
+      ansible.builtin.shell: |
+        yes | php artisan db:seed --force
+      args:
+        chdir: "{{ mikrometer_path }}"
+      register: seeder_result
+      when: has_changes
+      become: false
+
+    - name: Add database seeding to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Database seeding executed'] }}"
+      when: has_changes and seeder_result is defined
+
+    - name: Make vite executable (only if changes)
       ansible.builtin.command:
         cmd: chmod +x node_modules/.bin/vite
         chdir: "{{ mikrometer_path }}"
+      register: vite_result
+      when: has_changes
       become: true
 
-    - name: Make esbuild executable
+    - name: Add Vite executable to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Vite permissions set'] }}"
+      when: has_changes and vite_result is defined
+
+    - name: Make esbuild executable (only if changes)
       ansible.builtin.command:
         cmd: chmod +x node_modules/@esbuild/linux-x64/bin/esbuild
         chdir: "{{ mikrometer_path }}"
+      register: esbuild_result
+      when: has_changes
       become: true
 
-    - name: NPM update & install
+    - name: Add Esbuild executable to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Esbuild permissions set'] }}"
+      when: has_changes and esbuild_result is defined
+
+    - name: NPM update & install (only if changes)
       ansible.builtin.command:
         cmd: sudo npm install
         chdir: "{{ mikrometer_path }}"
+      register: npm_install_result
+      when: has_changes
       become: false
 
-    - name: NPM build
+    - name: Add NPM install to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ NPM dependencies installed'] }}"
+      when: has_changes and npm_install_result is defined
+
+    - name: NPM build (only if changes)
       ansible.builtin.command:
         cmd: sudo npm run build
         chdir: "{{ mikrometer_path }}"
+      register: npm_build_result
+      when: has_changes
       become: false
 
-    - name: Laravel artisan cache commands
+    - name: Add NPM build to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Frontend assets built'] }}"
+      when: has_changes and npm_build_result is defined
+
+    - name: Laravel artisan cache commands (only if changes)
       ansible.builtin.shell: |
         sudo php artisan config:cache
         sudo php artisan route:cache
@@ -59,12 +139,53 @@
         sudo php artisan event:cache
       args:
         chdir: "{{ mikrometer_path }}"
+      register: cache_result
+      when: has_changes
+
+    - name: Add cache commands to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Laravel caches refreshed'] }}"
+      when: has_changes and cache_result is defined
 
     - name: Change ownership back to mikrometer_user
       ansible.builtin.command:
         cmd: "sudo chown -R {{ mikrometer_user }}:{{ mikrometer_user }} {{ mikrometer_path }}"
+      register: ownership_result
 
+    - name: Add ownership change to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Ownership restored to mikrometer_user'] }}"
+      when: ownership_result is defined
 
-    - name: Change ownership back to mikrometer_group
+    - name: Change permissions back to mikrometer_group
       ansible.builtin.command:
         cmd: "sudo chmod -R g+w {{ mikrometer_path }}"
+      register: permissions_result
+
+    - name: Add permissions change to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Group write permissions set'] }}"
+      when: permissions_result is defined
+
+    - name: Show update summary when changes were made
+      ansible.builtin.debug:
+        msg: |
+          🚀 DEPLOYMENT SUMMARY - Changes Applied:
+          {% for item in update_summary %}
+          {{ item }}
+          {% endfor %}
+          Total tasks completed: {{ update_summary | length }}
+      when: has_changes and update_summary | length > 0
+
+    - name: Show skip message if no changes
+      ansible.builtin.debug:
+        msg: |
+          ℹ️  DEPLOYMENT SUMMARY - No Changes Needed:
+          - No changes detected in git repository
+          - All update tasks were skipped
+          - Ownership and permissions were verified
+      when: not has_changes
+
+    - name: Show final completion message
+      ansible.builtin.debug:
+        msg: "✅ Deployment process completed successfully!"
