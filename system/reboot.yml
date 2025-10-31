@@ -1,26 +1,30 @@
 ---
-- name: Test sudo functionality
+- name: Reboot all servers
   hosts: all
   become: yes
 
   tasks:
-    - name: Test basic sudo command
+    - name: Reboot server using sudo shutdown
       ansible.builtin.command:
-        cmd: "sudo whoami"
-      register: sudo_test
-
-    - name: Show sudo test result
-      ansible.builtin.debug:
-        var: sudo_test.stdout
-
-    - name: Test sudo with reboot command
-      ansible.builtin.command:
-        cmd: "sudo shutdown -r +1"
-      register: reboot_test
+        cmd: "sudo shutdown -r +1 'Ansible triggered reboot'"
       async: 1
       poll: 0
-      ignore_errors: yes
+      register: reboot_cmd
 
-    - name: Show reboot test result
-      ansible.builtin.debug:
-        var: reboot_test
+    - name: Wait for server to go offline
+      ansible.builtin.wait_for_connection:
+        connect_timeout: 10
+        sleep: 5
+        delay: 5
+        timeout: 300
+        state: absent
+
+    - name: Wait for server to come back online
+      ansible.builtin.wait_for_connection:
+        connect_timeout: 20
+        sleep: 10
+        delay: 30
+        timeout: 600
+
+    - name: Verify system is back online
+      ansible.builtin.ping:
