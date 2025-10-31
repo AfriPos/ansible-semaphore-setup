@@ -12,70 +12,44 @@
       ansible.builtin.command:
         cmd: "sudo chown -R {{ ansible_user }}:{{ ansible_user }} {{ mikrometer_path }}"
 
-    - name: Check for Git changes (fetch first)
+    - name: Check for Git changes
       ansible.builtin.command:
-        cmd: git fetch
-        chdir: "{{ mikrometer_path }}"
-      register: git_fetch
-      changed_when: false
-      become: false
-
-    - name: Check Git status for changes
-      ansible.builtin.command:
-        cmd: git status --porcelain
+        cmd: git fetch && git status --porcelain
         chdir: "{{ mikrometer_path }}"
       register: git_status
-      changed_when: false
-      become: false
-
-    - name: Check if local is behind remote
-      ansible.builtin.shell:
-        cmd: |
-          git fetch
-          LOCAL=$(git rev-parse @)
-          REMOTE=$(git rev-parse @{u})
-          if [ "$LOCAL" != "$REMOTE" ]; then
-            echo "behind"
-          else
-            echo "up-to-date"
-          fi
-        chdir: "{{ mikrometer_path }}"
-      register: git_behind
       changed_when: false
       become: false
 
     - name: Set has_changes variable if there are changes
       ansible.builtin.set_fact:
         has_changes: true
-      when: >
-        git_status.stdout != "" or 
-        git_behind.stdout == "behind"
+      when: git_status.stdout != ""
 
     - name: Git pull (only if changes)
       ansible.builtin.command:
         cmd: git pull
         chdir: "{{ mikrometer_path }}"
       register: git_pull_result
-      # when: has_changes
+      when: has_changes
       become: false
 
     - name: Add Git pull to summary
       ansible.builtin.set_fact:
         update_summary: "{{ update_summary + ['✓ Git repository updated'] }}"
-      # when: has_changes and git_pull_result is defined
+      when: has_changes and git_pull_result is defined
 
     - name: Composer update (only if changes)
       ansible.builtin.command:
         cmd: composer update
         chdir: "{{ mikrometer_path }}"
       register: composer_result
-      # when: has_changes
+      when: has_changes
       become: false
 
     - name: Add Composer update to summary
       ansible.builtin.set_fact:
         update_summary: "{{ update_summary + ['✓ Composer dependencies updated'] }}"
-      # when: has_changes and composer_result is defined
+      when: has_changes and composer_result is defined
 
     - name: Run database migrations (force yes in production) (only if changes)
       ansible.builtin.shell: |
@@ -83,13 +57,13 @@
       args:
         chdir: "{{ mikrometer_path }}"
       register: migration_result
-      # when: has_changes
+      when: has_changes
       become: false
 
     - name: Add database migrations to summary
       ansible.builtin.set_fact:
         update_summary: "{{ update_summary + ['✓ Database migrations executed'] }}"
-      # when: has_changes and migration_result is defined
+      when: has_changes and migration_result is defined
 
     - name: Run database seeder (force in production) (only if changes)
       ansible.builtin.shell: |
@@ -97,65 +71,65 @@
       args:
         chdir: "{{ mikrometer_path }}"
       register: seeder_result
-      # when: has_changes
+      when: has_changes
       become: false
 
     - name: Add database seeding to summary
       ansible.builtin.set_fact:
         update_summary: "{{ update_summary + ['✓ Database seeding executed'] }}"
-      # when: has_changes and seeder_result is defined
+      when: has_changes and seeder_result is defined
 
     - name: Make vite executable (only if changes)
       ansible.builtin.command:
         cmd: chmod +x node_modules/.bin/vite
         chdir: "{{ mikrometer_path }}"
       register: vite_result
-      # when: has_changes
+      when: has_changes
       become: true
 
     - name: Add Vite executable to summary
       ansible.builtin.set_fact:
         update_summary: "{{ update_summary + ['✓ Vite permissions set'] }}"
-      # when: has_changes and vite_result is defined
+      when: has_changes and vite_result is defined
 
     - name: Make esbuild executable (only if changes)
       ansible.builtin.command:
         cmd: chmod +x node_modules/@esbuild/linux-x64/bin/esbuild
         chdir: "{{ mikrometer_path }}"
       register: esbuild_result
-      # when: has_changes
+      when: has_changes
       become: true
 
     - name: Add Esbuild executable to summary
       ansible.builtin.set_fact:
         update_summary: "{{ update_summary + ['✓ Esbuild permissions set'] }}"
-      # when: has_changes and esbuild_result is defined
+      when: has_changes and esbuild_result is defined
 
     - name: NPM update & install (only if changes)
       ansible.builtin.command:
         cmd: sudo npm install
         chdir: "{{ mikrometer_path }}"
       register: npm_install_result
-      # when: has_changes
+      when: has_changes
       become: false
 
     - name: Add NPM install to summary
       ansible.builtin.set_fact:
         update_summary: "{{ update_summary + ['✓ NPM dependencies installed'] }}"
-      # when: has_changes and npm_install_result is defined
+      when: has_changes and npm_install_result is defined
 
     - name: NPM build (only if changes)
       ansible.builtin.command:
         cmd: sudo npm run build
         chdir: "{{ mikrometer_path }}"
       register: npm_build_result
-      # when: has_changes
+      when: has_changes
       become: false
 
     - name: Add NPM build to summary
       ansible.builtin.set_fact:
         update_summary: "{{ update_summary + ['✓ Frontend assets built'] }}"
-      # when: has_changes and npm_build_result is defined
+      when: has_changes and npm_build_result is defined
 
     - name: Laravel artisan cache commands (only if changes)
       ansible.builtin.shell: |
@@ -166,12 +140,12 @@
       args:
         chdir: "{{ mikrometer_path }}"
       register: cache_result
-      # when: has_changes
+      when: has_changes
 
     - name: Add cache commands to summary
       ansible.builtin.set_fact:
         update_summary: "{{ update_summary + ['✓ Laravel caches refreshed'] }}"
-      # when: has_changes and cache_result is defined
+      when: has_changes and cache_result is defined
 
     - name: Change ownership back to mikrometer_user
       ansible.builtin.command:
@@ -201,7 +175,7 @@
           {{ item }}
           {% endfor %}
           Total tasks completed: {{ update_summary | length }}
-      # when: has_changes and update_summary | length > 0
+      when: has_changes and update_summary | length > 0
 
     - name: Show skip message if no changes
       ansible.builtin.debug:
