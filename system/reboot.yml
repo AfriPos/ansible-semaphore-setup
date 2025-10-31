@@ -1,9 +1,26 @@
 ---
-- name: Reboot all servers
+- name: Test sudo functionality
   hosts: all
   become: yes
+
   tasks:
-    - name: Reboot the servers
-      ansible.builtin.reboot:
-        reboot_timeout: 600
-        test_command: whoami
+    - name: Test basic sudo command
+      ansible.builtin.command:
+        cmd: "sudo whoami"
+      register: sudo_test
+
+    - name: Show sudo test result
+      ansible.builtin.debug:
+        var: sudo_test.stdout
+
+    - name: Test sudo with reboot command
+      ansible.builtin.command:
+        cmd: "sudo shutdown -r +1"
+      register: reboot_test
+      async: 1
+      poll: 0
+      ignore_errors: yes
+
+    - name: Show reboot test result
+      ansible.builtin.debug:
+        var: reboot_test
