@@ -2,6 +2,7 @@
 - name: Reboot all servers
   hosts: all
   become: yes
+  gather_facts: no  # Disable initial fact gathering
 
   tasks:
     - name: Reboot server using sudo shutdown
@@ -9,23 +10,15 @@
         cmd: "sudo shutdown -r +1 'Ansible triggered reboot'"
       async: 1
       poll: 0
-      register: reboot_cmd
-
-    - name: Wait for server to go offline (wait for connection to fail)
-      ansible.builtin.wait_for_connection:
-        connect_timeout: 10
-        sleep: 5
-        delay: 5
-        timeout: 300
-      register: wait_offline
-      failed_when: wait_offline.state != "closed"
 
     - name: Wait for server to come back online
       ansible.builtin.wait_for_connection:
-        connect_timeout: 20
-        sleep: 10
-        delay: 30
-        timeout: 600
+        delay: 120  # Wait 2 minutes before starting checks
+        timeout: 300  # 5 minute timeout total
 
-    - name: Verify system is back online
+    - name: Simple connectivity test (skip fact gathering)
       ansible.builtin.ping:
+
+    - name: Optional - Gather facts only after confirming connectivity
+      ansible.builtin.setup:
+      when: false  # Disable by default, set to true if you need facts
