@@ -12,9 +12,9 @@
       ansible.builtin.command:
         cmd: "sudo chown -R {{ ansible_user }}:{{ ansible_user }} {{ mikrometer_path }}"
 
-    - name: Check for Git changes
-      ansible.builtin.command:
-        cmd: git fetch && git status --porcelain
+    - name: Check for Git changes (using shell for multiple commands)
+      ansible.builtin.shell:
+        cmd: "git fetch && git status --porcelain"
         chdir: "{{ mikrometer_path }}"
       register: git_status
       changed_when: false
