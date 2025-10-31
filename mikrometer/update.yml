@@ -12,18 +12,44 @@
       ansible.builtin.command:
         cmd: "sudo chown -R {{ ansible_user }}:{{ ansible_user }} {{ mikrometer_path }}"
 
-    - name: Check for Git changes
+    - name: Check for Git changes (fetch first)
       ansible.builtin.command:
-        cmd: git fetch && git status --porcelain
+        cmd: git fetch
+        chdir: "{{ mikrometer_path }}"
+      register: git_fetch
+      changed_when: false
+      become: false
+
+    - name: Check Git status for changes
+      ansible.builtin.command:
+        cmd: git status --porcelain
         chdir: "{{ mikrometer_path }}"
       register: git_status
+      changed_when: false
+      become: false
+
+    - name: Check if local is behind remote
+      ansible.builtin.shell:
+        cmd: |
+          git fetch
+          LOCAL=$(git rev-parse @)
+          REMOTE=$(git rev-parse @{u})
+          if [ "$LOCAL" != "$REMOTE" ]; then
+            echo "behind"
+          else
+            echo "up-to-date"
+          fi
+        chdir: "{{ mikrometer_path }}"
+      register: git_behind
       changed_when: false
       become: false
 
     - name: Set has_changes variable if there are changes
       ansible.builtin.set_fact:
         has_changes: true
-      when: git_status.stdout != ""
+      when: >
+        git_status.stdout != "" or 
+        git_behind.stdout == "behind"
 
     - name: Git pull (only if changes)
       ansible.builtin.command:
