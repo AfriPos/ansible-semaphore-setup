@@ -9,14 +9,13 @@
         cmd: "sudo shutdown -r +1 'Ansible triggered reboot'"
       async: 1
       poll: 0
-      register: reboot_cmd
 
     - name: Wait for server to come back online
       ansible.builtin.wait_for_connection:
-        connect_timeout: 20
+        connect_timeout: 30
         sleep: 10
-        delay: 30
-        timeout: 600
+        delay: 90  # Start checking after 90 seconds to account for reboot time
+        timeout: 600  # Total 10 minute timeout
 
     - name: Verify system is back online
       ansible.builtin.ping:
