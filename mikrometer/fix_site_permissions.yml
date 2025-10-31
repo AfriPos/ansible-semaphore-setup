@@ -1,0 +1,28 @@
+---
+- name: Fix site permissions
+  hosts: all
+  become: true
+  vars:
+    update_summary: []
+
+  tasks:
+    - name: Change permissions back to mikrometer_group
+      ansible.builtin.command:
+        cmd: "chmod -R g+w {{ mikrometer_path }}"
+      register: permissions_result
+      changed_when: permissions_result.rc == 0
+
+    - name: Add ownership change to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Ownership restored to mikrometer_user'] }}"
+      when: ownership_result is defined
+
+    - name: Add permissions change to summary  
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Group write permissions added to mikrometer_group'] }}"
+      when: permissions_result is defined
+
+    - name: Show update summary
+      ansible.builtin.debug:
+        msg: "{{ update_summary | join('\n') }}"
+      when: update_summary | length > 0
