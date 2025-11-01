@@ -1,0 +1,145 @@
+---
+- name: Update Mikrometer System
+  hosts: all
+  become: true
+
+  vars:
+    update_summary: []
+
+  tasks:
+    - name: Change ownership to ansible user
+      ansible.builtin.command:
+        cmd: "sudo chown -R {{ ansible_user }}:{{ ansible_user }} {{ system_path }}"
+
+    - name: Git pull
+      ansible.builtin.command:
+        cmd: git pull
+        chdir: "{{ system_path }}"
+      register: git_pull_result
+      become: false
+
+    - name: Add Git pull to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Git repository updated'] }}"
+      when: git_pull_result is defined
+
+    - name: Composer update
+      ansible.builtin.command:
+        cmd: composer update
+        chdir: "{{ system_path }}"
+      register: composer_result
+      become: false
+
+    - name: Add Composer update to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Composer dependencies updated'] }}"
+      when: composer_result is defined
+
+    - name: Run database migrations (force yes in production)
+      ansible.builtin.shell: |
+        yes | php artisan migrate --force
+      args:
+        chdir: "{{ system_path }}"
+      register: migration_result
+      become: false
+
+    - name: Add database migrations to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Database migrations executed'] }}"
+      when: migration_result is defined
+
+    - name: Make vite executable
+      ansible.builtin.command:
+        cmd: chmod +x node_modules/.bin/vite
+        chdir: "{{ system_path }}"
+      register: vite_result
+      become: true
+
+    - name: Add Vite executable to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Vite permissions set'] }}"
+      when: vite_result is defined
+
+    - name: Make esbuild executable
+      ansible.builtin.command:
+        cmd: chmod +x node_modules/@esbuild/linux-x64/bin/esbuild
+        chdir: "{{ system_path }}"
+      register: esbuild_result
+      become: true
+
+    - name: Add Esbuild executable to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Esbuild permissions set'] }}"
+      when: esbuild_result is defined
+
+    - name: NPM update & install
+      ansible.builtin.command:
+        cmd: sudo npm install
+        chdir: "{{ system_path }}"
+      register: npm_install_result
+      become: false
+
+    - name: Add NPM install to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ NPM dependencies installed'] }}"
+      when: npm_install_result is defined
+
+    - name: NPM build
+      ansible.builtin.command:
+        cmd: sudo npm run build
+        chdir: "{{ system_path }}"
+      register: npm_build_result
+      become: false
+
+    - name: Add NPM build to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Frontend assets built'] }}"
+      when: npm_build_result is defined
+
+    - name: Laravel artisan cache commands
+      ansible.builtin.shell: |
+        sudo php artisan config:cache
+        sudo php artisan route:cache
+        sudo php artisan view:cache
+        sudo php artisan event:cache
+      args:
+        chdir: "{{ system_path }}"
+      register: cache_result
+
+    - name: Add cache commands to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Laravel caches refreshed'] }}"
+      when: cache_result is defined
+
+    - name: Change ownership back to system_user
+      ansible.builtin.command:
+        cmd: "sudo chown -R {{ system_user }}:{{ system_user }} {{ system_path }}"
+      register: ownership_result
+
+    - name: Add ownership change to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Ownership restored to system_user'] }}"
+      when: ownership_result is defined
+
+    - name: Change permissions back to mikrometer_group
+      ansible.builtin.command:
+        cmd: "sudo chmod -R g+w {{ system_path }}"
+      register: permissions_result
+
+    - name: Add permissions change to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Group write permissions set'] }}"
+      when: permissions_result is defined
+
+    - name: Show update summary
+      ansible.builtin.debug:
+        msg: |
+          🚀 DEPLOYMENT SUMMARY:
+          {% for item in update_summary %}
+          {{ item }}
+          {% endfor %}
+          Total tasks completed: {{ update_summary | length }}
+
+    - name: Show final completion message
+      ansible.builtin.debug:
+        msg: "✅ Deployment process completed successfully!"
