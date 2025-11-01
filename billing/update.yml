@@ -131,6 +131,17 @@
         update_summary: "{{ update_summary + ['✓ Group write permissions set'] }}"
       when: permissions_result is defined
 
+    - name: Restart supervisor service
+      ansible.builtin.command:
+        cmd: sudo systemctl restart supervisor
+      register: supervisor_result
+      become: true
+    
+    - name: Add supervisor restart to summary
+      ansible.builtin.set_fact:
+        update_summary: "{{ update_summary + ['✓ Supervisor service restarted'] }}"
+      when: supervisor_result is defined
+      
     - name: Show update summary
       ansible.builtin.debug:
         msg: |
