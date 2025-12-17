@@ -35,14 +35,12 @@
         cmd: "firewall-cmd --zone=public --remove-port={{ item }}/tcp --permanent"
       loop: "{{ virtualmin_ports }}"
       ignore_errors: yes
-      notify: Reload firewalld
 
     - name: Remove mail services from public zone
       ansible.builtin.command:
         cmd: "firewall-cmd --zone=public --remove-service={{ item }} --permanent"
       loop: "{{ mail_services }}"
       ignore_errors: yes
-      notify: Reload firewalld
 
     - name: Create an ipset for allowed FTP/SFTP IPs
       ansible.builtin.command:
@@ -62,16 +60,10 @@
       loop: "{{ ftp_ports }}"
 
     - name: Allow Virtualmin/Webmin only from server IP
-      ansible.builtin.firewalld:
-        zone: public
-        rich_rule: 'rule family="ipv4" source address="{{ ansible_host }}" port port="{{ item }}" protocol="tcp" accept'
-        state: enabled
-        permanent: true
+      ansible.builtin.command:
+        cmd: "firewall-cmd --permanent --zone=public --add-rich-rule='rule family=ipv4 source address={{ ansible_host }} port port={{ item }} protocol=tcp accept'"
       loop: "{{ virtualmin_ports }}"
-      notify: Reload firewalld
 
-  handlers:
     - name: Reload firewalld
       ansible.builtin.command:
         cmd: "firewall-cmd --reload"
-
