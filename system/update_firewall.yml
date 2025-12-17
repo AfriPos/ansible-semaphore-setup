@@ -3,7 +3,6 @@
   hosts: all
   become: true
   vars:
-    # List of IPs allowed to access FTP/SFTP
     allowed_ips:
       - "134.255.183.25"
       - "89.117.50.10"
@@ -13,7 +12,6 @@
       - "144.91.92.23"
       - "37.60.247.176"
 
-    # Mail services to remove from public zone
     mail_services:
       - smtp
       - smtps
@@ -23,12 +21,10 @@
       - pop3
       - pop3s
 
-    # Ports used by Virtualmin/Webmin
     virtualmin_ports:
       - 10000
       - 20000
 
-    # FTP/SFTP ports
     ftp_ports:
       - 21
       - 2222
@@ -42,12 +38,10 @@
       notify: Reload firewalld
 
     - name: Remove mail services from public zone
-      ansible.builtin.firewalld:
-        zone: public
-        service: "{{ item }}"
-        state: disabled
-        permanent: true
+      ansible.builtin.command:
+        cmd: "firewall-cmd --zone=public --remove-service={{ item }} --permanent"
       loop: "{{ mail_services }}"
+      ignore_errors: yes
       notify: Reload firewalld
 
     - name: Create an ipset for allowed FTP/SFTP IPs
