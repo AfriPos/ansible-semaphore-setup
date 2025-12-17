@@ -12,7 +12,7 @@
       - "144.91.92.23"
       - "37.60.247.176"
 
-    mail_services:
+    services:
       - smtp
       - smtps
       - "smtp-submission"
@@ -20,10 +20,12 @@
       - imaps
       - pop3
       - pop3s
+      - ftp
 
     virtualmin_ports:
       - 10000
       - 20000
+      - 2222
 
     ftp_ports:
       - 21
@@ -39,7 +41,7 @@
     - name: Remove mail services from public zone
       ansible.builtin.command:
         cmd: "sudo firewall-cmd --zone=public --remove-service={{ item }} --permanent"
-      loop: "{{ mail_services }}"
+      loop: "{{ services }}"
       ignore_errors: yes
 
     - name: Create an ipset for allowed FTP/SFTP IPs
