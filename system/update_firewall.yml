@@ -22,10 +22,14 @@
       - pop3s
       - ftp
 
-    virtualmin_ports:
+    ports:
       - 10000
       - 20000
       - 2222
+
+    virtualmin_ports:
+      - 10000
+      - 20000
 
     ftp_ports:
       - 21
@@ -33,52 +37,39 @@
 
   tasks:
     - name: Remove Virtualmin/Webmin ports from public zone
-      ansible.posix.firewalld:
-        zone: public
-        port: "{{ item }}/tcp"
-        state: absent
-        permanent: true
-      loop: "{{ virtualmin_ports }}"
+      ansible.builtin.command:
+        cmd: "sudo firewall-cmd --zone=public --remove-port={{ item }}/tcp --permanent"
+      loop: "{{ ports }}"
+      ignore_errors: yes
 
     - name: Remove mail services from public zone
-      ansible.posix.firewalld:
-        zone: public
-        service: "{{ item }}"
-        state: absent
-        permanent: true
+      ansible.builtin.command:
+        cmd: "sudo firewall-cmd --zone=public --remove-service={{ item }} --permanent"
       loop: "{{ services }}"
+      ignore_errors: yes
 
-    - name: Ensure ipset exists for FTP/SFTP allowed IPs
-      ansible.posix.firewalld:
-        ipset: ftp_allowed
-        type: hash:ip
-        state: present
-        permanent: true
+    - name: Create an ipset for allowed FTP/SFTP IPs
+      ansible.builtin.command:
+        cmd: "sudo firewall-cmd --permanent --new-ipset=ftp_allowed --type=hash:ip"
+      register: ipset_create
+      failed_when: ipset_create.rc != 0 and 'already exists' not in (ipset_create.stdout + ipset_create.stderr | default(''))
+      ignore_errors: yes
 
     - name: Add allowed IPs to ipset
-      ansible.posix.firewalld:
-        ipset: ftp_allowed
-        entry: "{{ item }}"
-        state: present
-        permanent: true
+      ansible.builtin.command:
+        cmd: "sudo firewall-cmd --permanent --ipset=ftp_allowed --add-entry={{ item }}"
       loop: "{{ allowed_ips }}"
 
-    - name: Allow FTP + SFTP only from allowed IPs
-      ansible.posix.firewalld:
-        zone: public
-        rich_rule: 'rule family="ipv4" source ipset="ftp_allowed" port port="{{ item }}" protocol="tcp" accept'
-        state: enabled
-        permanent: true
+    - name: Allow FTP + SFTP only from the ipset
+      ansible.builtin.command:
+        cmd: "sudo firewall-cmd --permanent --zone=public --add-rich-rule='rule family=ipv4 source ipset=ftp_allowed port port={{ item }} protocol=tcp accept'"
       loop: "{{ ftp_ports }}"
 
     - name: Allow Virtualmin/Webmin only from server IP
-      ansible.posix.firewalld:
-        zone: public
-        rich_rule: 'rule family="ipv4" source address="{{ ansible_host }}" port port="{{ item }}" protocol="tcp" accept'
-        state: enabled
-        permanent: true
+      ansible.builtin.command:
+        cmd: "sudo firewall-cmd --permanent --zone=public --add-rich-rule='rule family=ipv4 source address={{ ansible_host }} port port={{ item }} protocol=tcp accept'"
       loop: "{{ virtualmin_ports }}"
 
     - name: Reload firewalld
-      ansible.posix.firewalld:
-        state: reloaded
+      ansible.builtin.command:
+        cmd: "sudo firewall-cmd --reload"
