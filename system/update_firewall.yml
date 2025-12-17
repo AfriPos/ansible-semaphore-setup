@@ -35,12 +35,10 @@
 
   tasks:
     - name: Remove Virtualmin/Webmin ports from public zone
-      ansible.builtin.firewalld:
-        zone: public
-        port: "{{ item }}/tcp"
-        state: absent
-        permanent: true
+      ansible.builtin.command:
+        cmd: "firewall-cmd --zone=public --remove-port={{ item }}/tcp --permanent"
       loop: "{{ virtualmin_ports }}"
+      ignore_errors: yes
       notify: Reload firewalld
 
     - name: Remove mail services from public zone
