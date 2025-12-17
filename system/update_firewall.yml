@@ -13,7 +13,7 @@
       - "144.91.92.23"
       - "37.60.247.176"
 
-    # Mail services to remove from public
+    # Mail services to remove from public zone
     mail_services:
       - smtp
       - smtps
@@ -45,7 +45,7 @@
       ansible.builtin.firewalld:
         zone: public
         service: "{{ item }}"
-        state: absent
+        state: disabled
         permanent: true
       loop: "{{ mail_services }}"
       notify: Reload firewalld
