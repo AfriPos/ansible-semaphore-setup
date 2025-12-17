@@ -32,38 +32,38 @@
   tasks:
     - name: Remove Virtualmin/Webmin ports from public zone
       ansible.builtin.command:
-        cmd: "firewall-cmd --zone=public --remove-port={{ item }}/tcp --permanent"
+        cmd: "sudo firewall-cmd --zone=public --remove-port={{ item }}/tcp --permanent"
       loop: "{{ virtualmin_ports }}"
       ignore_errors: yes
 
     - name: Remove mail services from public zone
       ansible.builtin.command:
-        cmd: "firewall-cmd --zone=public --remove-service={{ item }} --permanent"
+        cmd: "sudo firewall-cmd --zone=public --remove-service={{ item }} --permanent"
       loop: "{{ mail_services }}"
       ignore_errors: yes
 
     - name: Create an ipset for allowed FTP/SFTP IPs
       ansible.builtin.command:
-        cmd: "firewall-cmd --permanent --new-ipset=ftp_allowed --type=hash:ip"
+        cmd: "sudo firewall-cmd --permanent --new-ipset=ftp_allowed --type=hash:ip"
       register: ipset_create
       failed_when: ipset_create.rc != 0 and 'already exists' not in (ipset_create.stdout + ipset_create.stderr | default(''))
       ignore_errors: yes
 
     - name: Add allowed IPs to ipset
       ansible.builtin.command:
-        cmd: "firewall-cmd --permanent --ipset=ftp_allowed --add-entry={{ item }}"
+        cmd: "sudo firewall-cmd --permanent --ipset=ftp_allowed --add-entry={{ item }}"
       loop: "{{ allowed_ips }}"
 
     - name: Allow FTP + SFTP only from the ipset
       ansible.builtin.command:
-        cmd: "firewall-cmd --permanent --zone=public --add-rich-rule='rule family=ipv4 source ipset=ftp_allowed port port={{ item }} protocol=tcp accept'"
+        cmd: "sudo firewall-cmd --permanent --zone=public --add-rich-rule='rule family=ipv4 source ipset=ftp_allowed port port={{ item }} protocol=tcp accept'"
       loop: "{{ ftp_ports }}"
 
     - name: Allow Virtualmin/Webmin only from server IP
       ansible.builtin.command:
-        cmd: "firewall-cmd --permanent --zone=public --add-rich-rule='rule family=ipv4 source address={{ ansible_host }} port port={{ item }} protocol=tcp accept'"
+        cmd: "sudo firewall-cmd --permanent --zone=public --add-rich-rule='rule family=ipv4 source address={{ ansible_host }} port port={{ item }} protocol=tcp accept'"
       loop: "{{ virtualmin_ports }}"
 
     - name: Reload firewalld
       ansible.builtin.command:
-        cmd: "firewall-cmd --reload"
+        cmd: "sudo firewall-cmd --reload"
