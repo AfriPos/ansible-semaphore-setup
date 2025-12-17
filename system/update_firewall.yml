@@ -5,8 +5,13 @@
   vars:
     # List of IPs allowed to access FTP/SFTP
     allowed_ips:
-      - "203.0.113.10"
-      - "198.51.100.25"
+      - "134.255.183.25"
+      - "89.117.50.10"
+      - "109.199.112.131"
+      - "109.199.104.81"
+      - "158.220.122.127"
+      - "144.91.92.23"
+      - "37.60.247.176"
 
     # Mail services to remove from public
     mail_services:
