@@ -98,6 +98,7 @@
 
     - name: Laravel artisan cache commands
       ansible.builtin.shell: |
+        sudo php artisan optimize:clear
         sudo php artisan config:cache
         sudo php artisan route:cache
         sudo php artisan view:cache
