@@ -116,6 +116,7 @@
         sudo php artisan route:cache
         sudo php artisan view:cache
         sudo php artisan event:cache
+        sudo php artisan queue:restart
       args:
         chdir: "{{ mikrometer_path }}"
       register: cache_result
