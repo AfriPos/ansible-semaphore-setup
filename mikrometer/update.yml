@@ -11,15 +11,12 @@
       ansible.builtin.command:
         cmd: "sudo chown -R {{ ansible_user }}:{{ ansible_user }} {{ mikrometer_path }}"
 
-    - name: Ensure latest code from GitHub
-      ansible.builtin.git:
-        repo: "https://github.com/AfriPos/mikrometer.git"
-        dest: "{{ mikrometer_path }}"
-        version: main
-        force: yes
-        update: yes
-      become: false
+    - name: Git pull
+      ansible.builtin.command:
+        cmd: git pull
+        chdir: "{{ mikrometer_path }}"
       register: git_pull_result
+      become: false
 
     - name: Add Git pull to summary
       ansible.builtin.set_fact:
