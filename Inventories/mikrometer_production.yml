@@ -5,11 +5,3 @@ cp4-netlinks ansible_host=100.100.10.104 mikrometer_path=/home/netlinks/public_h
 cp5-fibernetkitui ansible_host=100.100.10.105 mikrometer_path=/home/fibernetkitui/public_html mikrometer_user=fibernetkitui
 cp6-smartnetconnections ansible_host=100.100.10.106 mikrometer_path=/home/smartnetconnections/public_html mikrometer_user=smartnetconnections
 cp7-zachnet ansible_host=100.100.10.107 mikrometer_path=/home/zachnet/public_html mikrometer_user=zachnet
-
-[servers:vars]
-ansible_user=dev-jm
-ansible_password=6HcT9J7ZokwAl6X
-ansible_become=true
-ansible_become_password=6HcT9J7ZokwAl6X
-ansible_become_method=sudo
-ansible_python_interpreter=/usr/bin/python3
